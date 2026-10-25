@@ -252,9 +252,9 @@ export default function DevicesPage() {
                 <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-left text-xs text-amber-300 flex items-start space-x-2">
                   <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
                   <span>
-                    Expires in 10 minutes. For testing right now, you can run in your terminal:
+                    Expires in 10 minutes. For testing right now, open a terminal in the project folder and run:
                     <code className="block mt-1 font-mono text-[11px] bg-slate-900 p-1.5 rounded text-slate-300">
-                      npm run dev:cli -- simulate -s {pairingData.pairingSessionId} -c {pairingData.code}
+                      cd Desktop\SMS-Provide ; npm run simulate -- -s {pairingData.pairingSessionId} -c {pairingData.code}
                     </code>
                   </span>
                 </div>
