@@ -1,0 +1,37 @@
+# Node & Dependencies
+node_modules/
+.npm/
+dist/
+build/
+.next/
+out/
+
+# Environment and Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Database
+dev.db
+dev.db-journal
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Android / Gradle
+apps/android-gateway/.gradle/
+apps/android-gateway/build/
+apps/android-gateway/app/build/
+apps/android-gateway/local.properties
+*.apk
+*.aab
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,16 @@
+{
+  "name": "@sms-gateway/api-client",
+  "version": "1.0.0",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc -w"
+  },
+  "dependencies": {
+    "@sms-gateway/shared": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

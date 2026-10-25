@@ -1,0 +1,23 @@
+{
+  "name": "@sms-gateway/cli",
+  "version": "1.0.0",
+  "type": "module",
+  "bin": {
+    "sms-gw": "./bin/sms-gw.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@sms-gateway/api-client": "*",
+    "@sms-gateway/shared": "*",
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "sms-gateway-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/api",
+    "apps/dashboard",
+    "apps/worker",
+    "apps/cli"
+  ],
+  "scripts": {
+    "dev:api": "npm --workspace=apps/api run dev",
+    "dev:dashboard": "npm --workspace=apps/dashboard run dev",
+    "dev:worker": "npm --workspace=apps/worker run dev",
+    "dev:cli": "npm --workspace=apps/cli run dev",
+    "dev": "concurrently \"npm:dev:api\" \"npm:dev:dashboard\" \"npm:dev:worker\"",
+    "build": "npm run build --workspaces --if-present",
+    "db:generate": "prisma generate --schema=./prisma/schema.prisma",
+    "db:push": "prisma db push --schema=./prisma/schema.prisma",
+    "db:seed": "node ./prisma/seed.js",
+    "test": "npm --workspace=apps/api test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "prisma": "^6.4.1",
+    "typescript": "^5.7.3"
+  }
+}

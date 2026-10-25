@@ -1,0 +1,194 @@
+// Prisma Schema for SMS Gateway Platform
+// Compatible with SQLite (for zero-config local dev) and PostgreSQL (for production)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  environment String   @default("development") // development, production
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  apiKeys         ApiKey[]
+  devices         Device[]
+  pairingSessions PairingSession[]
+  messages        Message[]
+  otpVerifications OtpVerification[]
+  optOuts         OptOut[]
+  broadcasts      Broadcast[]
+  webhooks        WebhookEndpoint[]
+}
+
+model ApiKey {
+  id           String    @id @default(uuid())
+  projectId    String
+  name         String
+  hashedSecret String    // SHA-256 hash of raw API key
+  prefix       String    // e.g. bk_test_... or bk_live_...
+  scopes       String    // JSON array or comma-separated scopes: messages:write, messages:read, devices:manage, webhooks:manage
+  lastUsedAt   DateTime?
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([hashedSecret])
+}
+
+model Device {
+  id           String    @id @default(uuid())
+  projectId    String
+  name         String
+  platform     String    @default("android") // android, simulator
+  status       String    @default("offline") // online, offline, unpaired
+  lastSeenAt   DateTime?
+  capabilities String?   // JSON object: battery, simSlots, simOperator, maxTps
+  secretHash   String    // Hashed device auth token
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  messages     Message[]
+
+  @@index([projectId])
+}
+
+model PairingSession {
+  id          String    @id @default(uuid())
+  projectId   String
+  codeHash    String    // Hashed one-time pairing code
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  attempts    Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model Message {
+  id             String    @id @default(uuid())
+  projectId      String
+  deviceId       String?
+  toEncrypted    String    // AES-256-GCM encrypted E.164 phone number
+  toRedacted     String    // Redacted format e.g. +91*****4321
+  bodyEncrypted  String    // AES-256-GCM encrypted SMS text
+  status         String    @default("queued") // queued, leased, accepted_by_device, submitted_to_android, sent, failed, simulated
+  idempotencyKey String?
+  errorMessage   String?
+  leaseExpiresAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  project        Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  device         Device?        @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  events         MessageEvent[]
+
+  @@unique([projectId, idempotencyKey])
+  @@index([projectId, status])
+  @@index([deviceId])
+}
+
+model MessageEvent {
+  id        String   @id @default(uuid())
+  messageId String
+  type      String   // queued, leased, accepted_by_device, submitted_to_android, sent, failed, simulated
+  timestamp DateTime @default(now())
+  metadata  String?  // JSON serialized metadata (redacted)
+
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+model OtpVerification {
+  id            String    @id @default(uuid())
+  projectId     String
+  phoneHash     String    // HMAC-SHA256 of phone with secret pepper
+  phoneRedacted String    // Redacted e.g. +91*****1234
+  codeHash      String    // HMAC-SHA256 of 6-digit code with pepper
+  expiresAt     DateTime
+  attempts      Int       @default(0)
+  maxAttempts   Int       @default(5)
+  verifiedAt    DateTime?
+  createdAt     DateTime  @default(now())
+
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, phoneHash])
+}
+
+model OptOut {
+  id            String   @id @default(uuid())
+  projectId     String
+  phoneHash     String   // HMAC-SHA256 of phone with pepper
+  phoneRedacted String   // Redacted e.g. +91*****1234
+  source        String   @default("API") // SMS_STOP, DASHBOARD, API
+  createdAt     DateTime @default(now())
+
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, phoneHash])
+  @@index([projectId])
+}
+
+model Broadcast {
+  id          String    @id @default(uuid())
+  projectId   String
+  name        String
+  status      String    @default("draft") // draft, processing, completed, cancelled, paused
+  totalCount  Int       @default(0)
+  sentCount   Int       @default(0)
+  failedCount Int       @default(0)
+  optOutCount Int       @default(0)
+  scheduledAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model WebhookEndpoint {
+  id              String   @id @default(uuid())
+  projectId       String
+  url             String
+  secretEncrypted String   // AES-256-GCM encrypted signing secret
+  eventTypes      String   // JSON array of event names e.g. ["message.sent", "otp.verified"]
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  deliveries      WebhookDelivery[]
+
+  @@index([projectId])
+}
+
+model WebhookDelivery {
+  id             String    @id @default(uuid())
+  endpointId     String
+  eventId        String
+  eventType      String
+  payload        String    // JSON string
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime?
+  status         String    @default("pending") // pending, delivered, failed
+  lastStatusCode Int?
+  lastError      String?
+  createdAt      DateTime  @default(now())
+
+  endpoint       WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([endpointId, status])
+}
