@@ -9,6 +9,7 @@ An end-to-end self-hostable SMS gateway platform inspired by the Bridge CLI work
 - 🔐 **OTP Engine**: Cryptographically secure 6-digit generation, pepper-hashed storage, rate limits, and timing-safe verification.
 - 📢 **Broadcasts & Opt-Outs**: CSV preview dry-runs, E.164 normalization, deduplication, and pre-send opt-out suppression.
 - 🔔 **Signed Webhooks**: HMAC-SHA256 signatures (`X-SMSGW-Signature: v1=...`) with exponential backoff retries.
+- 🚀 **LinkedIn Launch Kit & Graphics**: Ready-to-publish post templates and high-res visuals in [`LINKEDIN_LAUNCH.md`](./LINKEDIN_LAUNCH.md) and [`image/`](./image).
 
 ---
 

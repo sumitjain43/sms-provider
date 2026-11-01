@@ -12,8 +12,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-slate-950 text-slate-100 flex">
+    <html lang="en" suppressHydrationWarning>
+      <body
+        suppressHydrationWarning
+        className="min-h-screen bg-slate-950 text-slate-100 flex"
+      >
         <Sidebar />
         <main className="flex-1 overflow-y-auto bg-slate-900 min-h-screen p-8">
           <div className="max-w-7xl mx-auto">

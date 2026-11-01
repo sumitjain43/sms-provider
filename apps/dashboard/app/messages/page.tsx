@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { MessageSquare, RefreshCw, Eye, X, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { MessageSquare, RefreshCw, Eye, X, Clock, CheckCircle2, AlertCircle, Send, Plus } from 'lucide-react';
 
 interface MessageItem {
   id: string;
@@ -34,6 +34,11 @@ export default function MessagesPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedMessage, setSelectedMessage] = useState<MessageDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [showCompose, setShowCompose] = useState(false);
+  const [composeTo, setComposeTo] = useState('+917375060497');
+  const [composeBody, setComposeBody] = useState('Hello! Yeh SMS mere real Android phone SIM se bheja gaya hai.');
+  const [isSending, setIsSending] = useState(false);
+  const [composeFeedback, setComposeFeedback] = useState<string | null>(null);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
   const API_KEY = process.env.NEXT_PUBLIC_API_KEY || 'bk_test_demo_secret_key_123456789';

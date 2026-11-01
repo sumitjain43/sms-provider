@@ -137,6 +137,17 @@ messagesRouter.post(
       if (config.simulatorMode) {
         setTimeout(async () => {
           try {
+            const physicalDevices = await prisma.device.count({
+              where: {
+                projectId,
+                platform: 'android',
+                status: 'online',
+              },
+            });
+            if (physicalDevices > 0) {
+              return; // Do not auto-simulate when real handsets are connected
+            }
+
             const current = await prisma.message.findUnique({ where: { id: message.id } });
             if (current && current.status === MESSAGE_STATUS.QUEUED) {
               await prisma.message.update({

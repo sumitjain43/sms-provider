@@ -16,11 +16,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import android.telephony.SmsManager
 import androidx.core.content.ContextCompat
 import com.smsgateway.android.service.SmsForegroundService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -47,6 +50,9 @@ class MainActivity : ComponentActivity() {
         checkAndRequestPermissions()
 
         val prefs = getSharedPreferences("sms_gateway_prefs", Context.MODE_PRIVATE)
+        if (prefs.contains("device_token")) {
+            startForegroundService()
+        }
 
         setContent {
             MaterialTheme {
@@ -138,7 +144,9 @@ class MainActivity : ComponentActivity() {
 
                                                     isPaired = true
                                                     statusMessage = "Paired successfully! Starting background service..."
-                                                    startForegroundService()
+                                                    CoroutineScope(Dispatchers.Main).launch {
+                                                        startForegroundService()
+                                                    }
                                                 } else {
                                                     statusMessage = "Pairing failed: ${resp.message}"
                                                 }
@@ -168,6 +176,44 @@ class MainActivity : ComponentActivity() {
                                     Text("Device ID: ${prefs.getString("device_id", "")}")
                                     Text("Gateway API: ${prefs.getString("api_base_url", "")}")
                                 }
+                            }
+
+                            LaunchedEffect(isPaired) {
+                                if (isPaired) {
+                                    while (true) {
+                                        val baseUrl = prefs.getString("api_base_url", "") ?: ""
+                                        val devId = prefs.getString("device_id", "") ?: ""
+                                        val devTok = prefs.getString("device_token", "") ?: ""
+                                        if (baseUrl.isNotEmpty() && devId.isNotEmpty() && devTok.isNotEmpty()) {
+                                            withContext(Dispatchers.IO) {
+                                                dispatchOnce(baseUrl, devId, devTok) { msg ->
+                                                    statusMessage = msg
+                                                }
+                                            }
+                                        }
+                                        delay(3000)
+                                    }
+                                }
+                            }
+
+                            Button(
+                                onClick = {
+                                    val baseUrl = prefs.getString("api_base_url", "") ?: ""
+                                    val devId = prefs.getString("device_id", "") ?: ""
+                                    val devTok = prefs.getString("device_token", "") ?: ""
+                                    statusMessage = "Checking server for queued messages..."
+                                    CoroutineScope(Dispatchers.IO).launch {
+                                        dispatchOnce(baseUrl, devId, devTok) { msg ->
+                                            statusMessage = msg
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary
+                                )
+                            ) {
+                                Text("⚡ Check & Send Queued Messages Now")
                             }
 
                             Button(
@@ -235,6 +281,90 @@ class MainActivity : ComponentActivity() {
             startForegroundService(serviceIntent)
         } else {
             startService(serviceIntent)
+        }
+    }
+
+    private fun dispatchOnce(
+        baseUrl: String,
+        deviceId: String,
+        token: String,
+        onStatus: (String) -> Unit
+    ) {
+        try {
+            // Heartbeat
+            val hbUrl = "$baseUrl/v1/devices/$deviceId/heartbeat"
+            val hbPayload = JSONObject().apply {
+                put("platform", "android")
+                put("androidVersion", Build.VERSION.RELEASE)
+                put("battery", 100)
+            }
+            val hbReq = Request.Builder()
+                .url(hbUrl)
+                .header("Authorization", "Bearer $token")
+                .post(hbPayload.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+            httpClient.newCall(hbReq).execute().close()
+
+            // Poll jobs
+            val jobsUrl = "$baseUrl/v1/devices/$deviceId/jobs"
+            val req = Request.Builder()
+                .url(jobsUrl)
+                .header("Authorization", "Bearer $token")
+                .get()
+                .build()
+
+            httpClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return
+                val bodyStr = resp.body?.string() ?: return
+                val json = JSONObject(bodyStr)
+                val jobsArray = json.optJSONArray("jobs") ?: return
+
+                for (i in 0 until jobsArray.length()) {
+                    val job = jobsArray.getJSONObject(i)
+                    val jobId = job.getString("id")
+                    val recipient = job.getString("to")
+                    val messageText = job.getString("body")
+
+                    onStatus("Dispatching SIM SMS to $recipient...")
+
+                    var success = false
+                    var errorMsg: String? = null
+                    try {
+                        val smsManager: SmsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            getSystemService(SmsManager::class.java)
+                                ?: @Suppress("DEPRECATION") SmsManager.getDefault()
+                        } else {
+                            @Suppress("DEPRECATION") SmsManager.getDefault()
+                        }
+                        val parts = smsManager.divideMessage(messageText)
+                        if (parts.size > 1) {
+                            smsManager.sendMultipartTextMessage(recipient, null, parts, null, null)
+                        } else {
+                            smsManager.sendTextMessage(recipient, null, messageText, null, null)
+                        }
+                        success = true
+                        onStatus("✓ Sent SMS to $recipient via SIM card!")
+                    } catch (e: Exception) {
+                        errorMsg = e.message ?: "Failed to send SMS"
+                        onStatus("Error: $errorMsg")
+                    }
+
+                    // Report result
+                    val resUrl = "$baseUrl/v1/jobs/$jobId/result"
+                    val payload = JSONObject().apply {
+                        put("status", if (success) "sent" else "failed")
+                        if (errorMsg != null) put("errorMessage", errorMsg)
+                    }
+                    val reportReq = Request.Builder()
+                        .url(resUrl)
+                        .header("Authorization", "Bearer $token")
+                        .post(payload.toString().toRequestBody("application/json".toMediaType()))
+                        .build()
+                    httpClient.newCall(reportReq).execute().close()
+                }
+            }
+        } catch (e: Exception) {
+            onStatus("Polling error: ${e.message}")
         }
     }
 }

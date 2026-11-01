@@ -3,6 +3,7 @@ package com.smsgateway.android.service
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.telephony.SmsManager
@@ -61,7 +62,15 @@ class SmsForegroundService : Service() {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
 
-        startForeground(NOTIFICATION_ID, notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     private fun startGatewayWorkers() {
@@ -150,6 +159,7 @@ class SmsForegroundService : Service() {
         try {
             val smsManager: SmsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 applicationContext.getSystemService(SmsManager::class.java)
+                    ?: @Suppress("DEPRECATION") SmsManager.getDefault()
             } else {
                 @Suppress("DEPRECATION")
                 SmsManager.getDefault()
